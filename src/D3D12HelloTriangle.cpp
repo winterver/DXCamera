@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#include "DXSample/Win32Application.h"
 #include "D3D12HelloTriangle.h"
 
 D3D12HelloTriangle::D3D12HelloTriangle(UINT width, UINT height, std::wstring name) :
@@ -39,7 +38,7 @@ void D3D12HelloTriangle::LoadPipeline()
     ComPtr<IDXGIFactory4> factory;
     ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 
-    if (m_useWarpDevice)
+    if (0/*m_useWarpDevice*/)
     {
         ComPtr<IDXGIAdapter> warpAdapter;
         ThrowIfFailed(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
@@ -82,7 +81,7 @@ void D3D12HelloTriangle::LoadPipeline()
     ComPtr<IDXGISwapChain1> swapChain;
     ThrowIfFailed(factory->CreateSwapChainForHwnd(
         m_commandQueue.Get(),        // Swap chain needs the queue so that it can force a flush on it.
-        Win32Application::GetHwnd(),
+        m_hWnd,
         &swapChainDesc,
         nullptr,
         nullptr,
@@ -90,7 +89,7 @@ void D3D12HelloTriangle::LoadPipeline()
         ));
 
     // This sample does not support fullscreen transitions.
-    ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
+    ThrowIfFailed(factory->MakeWindowAssociation(m_hWnd, DXGI_MWA_NO_ALT_ENTER));
 
     ThrowIfFailed(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();

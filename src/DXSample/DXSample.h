@@ -17,24 +17,13 @@ public:
     UINT GetWidth() const           { return m_width; }
     UINT GetHeight() const          { return m_height; }
     const WCHAR* GetTitle() const   { return m_title.c_str(); }
-
-    void ParseCommandLineArgs(_In_reads_(argc) WCHAR* argv[], int argc);
+    void SetHWND(HWND hWnd)         { m_hWnd = hWnd; }
 
 protected:
-    void GetHardwareAdapter(
-        _In_ IDXGIFactory1* pFactory,
-        _Outptr_result_maybenull_ IDXGIAdapter1** ppAdapter,
-        bool requestHighPerformanceAdapter = false);
-
-    void SetCustomWindowText(LPCWSTR text);
-
-    // Viewport dimensions.
     UINT m_width;
     UINT m_height;
     float m_aspectRatio;
-
-    // Adapter info.
-    bool m_useWarpDevice;
+    HWND m_hWnd;
 
 private:
     std::wstring m_title;

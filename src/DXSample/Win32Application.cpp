@@ -1,16 +1,11 @@
 #include "../stdafx.h"
 #include "Win32Application.h"
-#include <shellapi.h>
+#include "DXSample.h"
 
 HWND Win32Application::m_hwnd = nullptr;
 
 int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
 {
-    int argc;
-    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    pSample->ParseCommandLineArgs(argv, argc);
-    LocalFree(argv);
-
     WNDCLASSEX windowClass = { 0 };
     windowClass.cbSize = sizeof(WNDCLASSEX);
     windowClass.style = CS_HREDRAW | CS_VREDRAW;
@@ -33,6 +28,7 @@ int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
         hInstance,
         pSample);
 
+    pSample->SetHWND(m_hwnd);
     pSample->OnInit();
     ShowWindow(m_hwnd, nCmdShow);
 
