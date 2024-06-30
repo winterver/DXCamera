@@ -1,5 +1,22 @@
+//*********************************************************
+//
+// Copyright (c) Microsoft. All rights reserved.
+// This code is licensed under the MIT License (MIT).
+// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
+// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
+// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
+// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
+//
+//*********************************************************
+
 #pragma once
 #include <stdexcept>
+
+// Note that while ComPtr is used to manage the lifetime of resources on the CPU,
+// it has no understanding of the lifetime of resources on the GPU. Apps must account
+// for the GPU lifetime of resources to avoid destroying objects that may still be
+// referenced by the GPU.
+using Microsoft::WRL::ComPtr;
 
 inline std::string HrToString(HRESULT hr)
 {
@@ -24,6 +41,27 @@ inline void ThrowIfFailed(HRESULT hr)
     if (FAILED(hr))
     {
         throw HrException(hr);
+    }
+}
+
+inline void GetAssetsPath(_Out_writes_(pathSize) WCHAR* path, UINT pathSize)
+{
+    if (path == nullptr)
+    {
+        throw std::exception();
+    }
+
+    DWORD size = GetModuleFileName(nullptr, path, pathSize);
+    if (size == 0 || size == pathSize)
+    {
+        // Method failed or path was truncated.
+        throw std::exception();
+    }
+
+    WCHAR* lastSlash = wcsrchr(path, L'\\');
+    if (lastSlash)
+    {
+        *(lastSlash + 1) = L'\0';
     }
 }
 
@@ -217,7 +255,7 @@ void ResetUniquePtrArray(T* uniquePtrArray)
 // Helper function for acquiring the first available hardware adapter that supports Direct3D 12.
 // If no such adapter can be found, *ppAdapter will be set to nullptr.
 _Use_decl_annotations_
-inline void GetHardwareAdapter(
+void GetHardwareAdapter(
     IDXGIFactory1* pFactory,
     IDXGIAdapter1** ppAdapter,
     bool requestHighPerformanceAdapter = false)

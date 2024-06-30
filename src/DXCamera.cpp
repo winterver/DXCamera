@@ -1,25 +1,15 @@
-#include "stdafx.h"
-#include "D3D12HelloTriangle.h"
+#include "DXCamera.h"
+#include "DXHelper.h"
 
-D3D12HelloTriangle::D3D12HelloTriangle(UINT width, UINT height, std::wstring name) :
-    DXSample(width, height, name),
-    m_frameIndex(0),
-    m_viewport(0.0f, 0.0f, (float)width, (float)height),
-    m_scissorRect(0, 0, (LONG)width, (LONG)height),
-    m_rtvDescriptorSize(0)
-{
-}
-
-void D3D12HelloTriangle::OnInit()
+void DXCamera::OnInit()
 {
     LoadPipeline();
     LoadAssets();
 }
 
-void D3D12HelloTriangle::LoadPipeline()
+void DXCamera::LoadPipeline()
 {
     UINT dxgiFactoryFlags = 0;
-
 #if defined(_DEBUG)
     // Enable the debug layer (requires the Graphics Tools "optional feature").
     // NOTE: Enabling the debug layer after device creation will invalidate the active device.
@@ -28,18 +18,19 @@ void D3D12HelloTriangle::LoadPipeline()
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
         {
             debugController->EnableDebugLayer();
-
-            // Enable additional debug layers.
             dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
         }
     }
 #endif
-
     ComPtr<IDXGIFactory4> factory;
     ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 
+    m_viewport = CD3DX12_VIEWPORT { 0.0f, 0.0f, (float)GetClientWidth(), (float)GetClientHeight() };
+    m_scissorRect = CD3DX12_RECT { 0, 0, (LONG)GetClientWidth(), (LONG)GetClientHeight() };
+
     if (0/*m_useWarpDevice*/)
     {
+        // WARP = a software rasterizer provided by Windows
         ComPtr<IDXGIAdapter> warpAdapter;
         ThrowIfFailed(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
 
@@ -61,56 +52,45 @@ void D3D12HelloTriangle::LoadPipeline()
             ));
     }
 
-    // Describe and create the command queue.
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-
     ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 
-    // Describe and create the swap chain.
+    ComPtr<IDXGISwapChain1> swapChain;
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
     swapChainDesc.BufferCount = FrameCount;
-    swapChainDesc.Width = m_width;
-    swapChainDesc.Height = m_height;
+    swapChainDesc.Width = GetClientWidth();
+    swapChainDesc.Height = GetClientHeight();
     swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     swapChainDesc.SampleDesc.Count = 1;
-
-    ComPtr<IDXGISwapChain1> swapChain;
     ThrowIfFailed(factory->CreateSwapChainForHwnd(
-        m_commandQueue.Get(),        // Swap chain needs the queue so that it can force a flush on it.
-        m_hWnd,
+        m_commandQueue.Get(),
+        GetHWND(),
         &swapChainDesc,
         nullptr,
         nullptr,
         &swapChain
         ));
-
-    // This sample does not support fullscreen transitions.
-    ThrowIfFailed(factory->MakeWindowAssociation(m_hWnd, DXGI_MWA_NO_ALT_ENTER));
-
     ThrowIfFailed(swapChain.As(&m_swapChain));
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-    // Create descriptor heaps.
+    // This sample does not support fullscreen transitions.
+    ThrowIfFailed(factory->MakeWindowAssociation(GetHWND(), DXGI_MWA_NO_ALT_ENTER));
+
     {
-        // Describe and create a render target view (RTV) descriptor heap.
-        D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
+        D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
         rtvHeapDesc.NumDescriptors = FrameCount;
         rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
-
         m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     }
 
-    // Create frame resources.
     {
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
-
-        // Create a RTV for each frame.
         for (UINT n = 0; n < FrameCount; n++)
         {
             ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
@@ -122,9 +102,8 @@ void D3D12HelloTriangle::LoadPipeline()
     ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
 }
 
-void D3D12HelloTriangle::LoadAssets()
+void DXCamera::LoadAssets()
 {
-    // Create an empty root signature.
     {
         CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -135,18 +114,14 @@ void D3D12HelloTriangle::LoadAssets()
         ThrowIfFailed(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
     }
 
-    // Create the pipeline state, which includes compiling and loading shaders.
     {
         ComPtr<ID3DBlob> vertexShader;
         ComPtr<ID3DBlob> pixelShader;
-
 #if defined(_DEBUG)
-        // Enable better shader debugging with the graphics debugging tools.
         UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #else
         UINT compileFlags = 0;
 #endif
-        
         const char source[] = R"(
             struct PSInput
             {
@@ -170,7 +145,7 @@ void D3D12HelloTriangle::LoadAssets()
             }
         )";
         ThrowIfFailed(D3DCompile(source, sizeof(source), nullptr, nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
-        ThrowIfFailed(D3DCompile(source, sizeof(source), nullptr, nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
+        ThrowIfFailed(D3DCompile(source, sizeof(source), nullptr, nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr)); 
 
         // Define the vertex input layout.
         D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
@@ -180,7 +155,7 @@ void D3D12HelloTriangle::LoadAssets()
         };
 
         // Describe and create the graphics pipeline state object (PSO).
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
         psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
         psoDesc.pRootSignature = m_rootSignature.Get();
         psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
@@ -198,7 +173,11 @@ void D3D12HelloTriangle::LoadAssets()
     }
 
     // Create the command list.
-    ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
+    ThrowIfFailed(m_device->CreateCommandList(
+        0, D3D12_COMMAND_LIST_TYPE_DIRECT, 
+        m_commandAllocator.Get(), 
+        m_pipelineState.Get(), 
+        IID_PPV_ARGS(&m_commandList)));
 
     // Command lists are created in the recording state, but there is nothing
     // to record yet. The main loop expects it to be closed, so close it now.
@@ -209,9 +188,9 @@ void D3D12HelloTriangle::LoadAssets()
         // Define the geometry for a triangle.
         Vertex triangleVertices[] =
         {
-            { { 0.0f, 0.25f * m_aspectRatio, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-            { { 0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-            { { -0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
+            { { 0.0f, 0.25f * GetAspectRatio(), 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+            { { 0.25f, -0.25f * GetAspectRatio(), 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+            { { -0.25f, -0.25f * GetAspectRatio(), 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
         };
 
         const UINT vertexBufferSize = sizeof(triangleVertices);
@@ -260,37 +239,28 @@ void D3D12HelloTriangle::LoadAssets()
     }
 }
 
-// Update frame-based values.
-void D3D12HelloTriangle::OnUpdate()
+void DXCamera::OnUpdate()
 {
 }
 
-// Render the scene.
-void D3D12HelloTriangle::OnRender()
+void DXCamera::OnRender()
 {
-    // Record all the commands we need to render the scene into the command list.
     PopulateCommandList();
 
-    // Execute the command list.
     ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-    // Present the frame.
     ThrowIfFailed(m_swapChain->Present(1, 0));
-
     WaitForPreviousFrame();
 }
 
-void D3D12HelloTriangle::OnDestroy()
+void DXCamera::OnDestroy()
 {
-    // Ensure that the GPU is no longer referencing resources that are about to be
-    // cleaned up by the destructor.
     WaitForPreviousFrame();
-
     CloseHandle(m_fenceEvent);
 }
 
-void D3D12HelloTriangle::PopulateCommandList()
+void DXCamera::PopulateCommandList()
 {
     // Command list allocators can only be reset when the associated 
     // command lists have finished execution on the GPU; apps should use 
@@ -326,7 +296,7 @@ void D3D12HelloTriangle::PopulateCommandList()
     ThrowIfFailed(m_commandList->Close());
 }
 
-void D3D12HelloTriangle::WaitForPreviousFrame()
+void DXCamera::WaitForPreviousFrame()
 {
     // WAITING FOR THE FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
     // This is code implemented as such for simplicity. The D3D12HelloFrameBuffering

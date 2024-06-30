@@ -1,17 +1,27 @@
 #pragma once
-#include "DXSample/DXSample.h"
+#include "Win32Application.h"
+#include "D3DX12/d3dx12.h"
+#include <d3d12.h>
+#include <dxgi1_6.h>
+#include <D3Dcompiler.h>
+#include <DirectXMath.h>
+#include <wrl.h>
 
-class D3D12HelloTriangle : public DXSample
+using namespace DirectX;
+using Microsoft::WRL::ComPtr;
+
+class DXCamera : public Win32Application
 {
 public:
-    D3D12HelloTriangle(UINT width, UINT height, std::wstring name);
+    DXCamera(std::wstring title, int width, int height)
+        : Win32Application(title, width, height) { }
 
+private:
     virtual void OnInit();
     virtual void OnUpdate();
     virtual void OnRender();
     virtual void OnDestroy();
 
-private:
     static const UINT FrameCount = 2;
 
     struct Vertex
@@ -23,8 +33,8 @@ private:
     // Pipeline objects.
     CD3DX12_VIEWPORT m_viewport;
     CD3DX12_RECT m_scissorRect;
-    ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Device> m_device;
+    ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
     ComPtr<ID3D12CommandAllocator> m_commandAllocator;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
