@@ -15,8 +15,7 @@ void DXCamera::LoadPipeline()
     // NOTE: Enabling the debug layer after device creation will invalidate the active device.
     {
         ComPtr<ID3D12Debug> debugController;
-        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
-        {
+        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
             debugController->EnableDebugLayer();
             dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
         }
@@ -28,26 +27,24 @@ void DXCamera::LoadPipeline()
     m_viewport = CD3DX12_VIEWPORT { 0.0f, 0.0f, (float)GetClientWidth(), (float)GetClientHeight() };
     m_scissorRect = CD3DX12_RECT { 0, 0, (LONG)GetClientWidth(), (LONG)GetClientHeight() };
 
-    if (0/*m_useWarpDevice*/)
-    {
+    if (0/*m_useWarpDevice*/) {
         // WARP = a software rasterizer provided by Windows
         ComPtr<IDXGIAdapter> warpAdapter;
         ThrowIfFailed(factory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
 
         ThrowIfFailed(D3D12CreateDevice(
-            warpAdapter.Get(),
-            D3D_FEATURE_LEVEL_11_0,
-            IID_PPV_ARGS(&m_device)));
+                    warpAdapter.Get(),
+                    D3D_FEATURE_LEVEL_11_0,
+                    IID_PPV_ARGS(&m_device)));
     }
-    else
-    {
+    else {
         ComPtr<IDXGIAdapter1> hardwareAdapter;
         GetHardwareAdapter(factory.Get(), &hardwareAdapter);
 
         ThrowIfFailed(D3D12CreateDevice(
-            hardwareAdapter.Get(),
-            D3D_FEATURE_LEVEL_11_0,
-            IID_PPV_ARGS(&m_device)));
+                    hardwareAdapter.Get(),
+                    D3D_FEATURE_LEVEL_11_0,
+                    IID_PPV_ARGS(&m_device)));
     }
 
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
@@ -88,8 +85,7 @@ void DXCamera::LoadPipeline()
 
     {
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
-        for (UINT n = 0; n < FrameCount; n++)
-        {
+        for (UINT n = 0; n < FrameCount; n++) {
             ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
             m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
             rtvHandle.Offset(1, m_rtvDescriptorSize);
@@ -146,8 +142,7 @@ void DXCamera::LoadAssets()
         ThrowIfFailed(D3DCompile(source, sizeof(source), nullptr, nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
         ThrowIfFailed(D3DCompile(source, sizeof(source), nullptr, nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr)); 
 
-        D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
-        {
+        D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
         };
@@ -170,16 +165,15 @@ void DXCamera::LoadAssets()
     }
 
     ThrowIfFailed(m_device->CreateCommandList(
-        0, D3D12_COMMAND_LIST_TYPE_DIRECT, 
-        m_commandAllocator.Get(), 
-        m_pipelineState.Get(), 
-        IID_PPV_ARGS(&m_commandList)));
+                0, D3D12_COMMAND_LIST_TYPE_DIRECT, 
+                m_commandAllocator.Get(), 
+                m_pipelineState.Get(), 
+                IID_PPV_ARGS(&m_commandList)));
     ThrowIfFailed(m_commandList->Close());
 
     // Create the vertex buffer.
     {
-        Vertex triangleVertices[] =
-        {
+        Vertex triangleVertices[] = {
             { { 0.0f, 0.25f * GetAspectRatio(), 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
             { { 0.25f, -0.25f * GetAspectRatio(), 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
             { { -0.25f, -0.25f * GetAspectRatio(), 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
@@ -214,8 +208,7 @@ void DXCamera::LoadAssets()
         m_fenceValue = 1;
 
         m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-        if (m_fenceEvent == nullptr)
-        {
+        if (m_fenceEvent == nullptr) {
             ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
         }
 
@@ -254,13 +247,13 @@ void DXCamera::PopulateCommandList()
     m_commandList->RSSetScissorRects(1, &m_scissorRect);
 
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-                                    m_renderTargets[m_frameIndex].Get(),
-                                    D3D12_RESOURCE_STATE_PRESENT,
-                                    D3D12_RESOURCE_STATE_RENDER_TARGET));
+                                m_renderTargets[m_frameIndex].Get(),
+                                D3D12_RESOURCE_STATE_PRESENT,
+                                D3D12_RESOURCE_STATE_RENDER_TARGET));
 
     CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(
-            m_rtvHeap->GetCPUDescriptorHandleForHeapStart(),
-            m_frameIndex, m_rtvDescriptorSize);
+                                m_rtvHeap->GetCPUDescriptorHandleForHeapStart(),
+                                m_frameIndex, m_rtvDescriptorSize);
     m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
     const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
@@ -270,9 +263,9 @@ void DXCamera::PopulateCommandList()
     m_commandList->DrawInstanced(3, 1, 0, 0);
 
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-                                    m_renderTargets[m_frameIndex].Get(), 
-                                    D3D12_RESOURCE_STATE_RENDER_TARGET, 
-                                    D3D12_RESOURCE_STATE_PRESENT));
+                                m_renderTargets[m_frameIndex].Get(), 
+                                D3D12_RESOURCE_STATE_RENDER_TARGET, 
+                                D3D12_RESOURCE_STATE_PRESENT));
 
     ThrowIfFailed(m_commandList->Close());
 }
@@ -288,8 +281,7 @@ void DXCamera::WaitForPreviousFrame()
     ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), fence));
     m_fenceValue++;
 
-    if (m_fence->GetCompletedValue() < fence)
-    {
+    if (m_fence->GetCompletedValue() < fence) {
         ThrowIfFailed(m_fence->SetEventOnCompletion(fence, m_fenceEvent));
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
